@@ -404,7 +404,8 @@ void cLcd::SetProgress(const char *begin, const char *end, int percent) {
 
   char workstring[256];
 
-  if (percent>100) percent=100; if (percent<0) percent=0;
+  if (percent>100) percent=100; 
+  if (percent<0) percent=0;
   if (begin==NULL) {
     BeginMutualExclusion();
       ThreadStateData.barx=1; ThreadStateData.bary=1; ThreadStateData.barl=0;
@@ -452,10 +453,14 @@ void cLcd::SetBuffer(unsigned int n, const char *l1,const char *l2,const char *l
   if (!connected) return;
 
   BeginMutualExclusion();
-    if (l1 != NULL) strncpy(ThreadStateData.lcdbuffer[n][0],l1,wid+1); ThreadStateData.lcddirty[n][0]=true;
-    if (l2 != NULL) strncpy(ThreadStateData.lcdbuffer[n][1],l2,wid+1); ThreadStateData.lcddirty[n][1]=true;
-    if (l3 != NULL) strncpy(ThreadStateData.lcdbuffer[n][2],l3,wid+1); ThreadStateData.lcddirty[n][2]=true;
-    if (l4 != NULL) strncpy(ThreadStateData.lcdbuffer[n][3],l4,wid+1); ThreadStateData.lcddirty[n][3]=true;
+    if (l1 != NULL) strncpy(ThreadStateData.lcdbuffer[n][0],l1,wid+1); 
+    ThreadStateData.lcddirty[n][0]=true;
+    if (l2 != NULL) strncpy(ThreadStateData.lcdbuffer[n][1],l2,wid+1); 
+    ThreadStateData.lcddirty[n][1]=true;
+    if (l3 != NULL) strncpy(ThreadStateData.lcdbuffer[n][2],l3,wid+1); 
+    ThreadStateData.lcddirty[n][2]=true;
+    if (l4 != NULL) strncpy(ThreadStateData.lcdbuffer[n][3],l4,wid+1); 
+    ThreadStateData.lcddirty[n][3]=true;
   EndMutualExclusion();
 }
 
@@ -850,12 +855,24 @@ void cLcd::Action(void) { // LCD output thread
 		  }
 
 		  if ( time(NULL) > nextLcdUpdate ) {
-			  cChannel *channel = Channels.GetByNumber(primaryDvbApi->CurrentChannel());
+//#if APIVERSNUM < 20301
+//			  cChannel *channel = Channels.GetByNumber(primaryDvbApi->CurrentChannel());
+//#else
+			  LOCK_CHANNELS_READ;
+			  const cChannel *channel = Channels->GetByNumber(primaryDvbApi->CurrentChannel());
+//#endif
 			  const cEvent *Present = NULL;
-			  cSchedulesLock schedulesLock;
-			  const cSchedules *Schedules = cSchedules::Schedules(schedulesLock);
-			  if (Schedules) {
-				  const cSchedule *Schedule = Schedules->GetSchedule(channel->GetChannelID());
+//#if APIVERSNUM < 20301
+//
+//			  cSchedulesLock schedulesLock;
+//			  const cSchedules *Schedules = cSchedules::Schedules(schedulesLock);
+//			  if (Schedules) {
+//				  const cSchedule *Schedule = Schedules->GetSchedule(channel->GetChannelID());
+//#else
+			  LOCK_SCHEDULES_READ;
+		          const cSchedule *Schedule = Schedules->GetSchedule(channel->GetChannelID());
+//#endif
+
 				  if (Schedule) {
 					  const char *PresentTitle, *PresentSubtitle;
 					  PresentTitle = NULL; PresentSubtitle = NULL;
@@ -870,10 +887,12 @@ void cLcd::Action(void) { // LCD output thread
 						  SetRunning(false,tr("No EPG info available."), NULL);
 					  if ((Present = Schedule->GetFollowingEvent()) != NULL)
 						  nextLcdUpdate=(Present->StartTime()<nextLcdUpdate)?Present->StartTime():nextLcdUpdate;
-						  rtcycle = 10; // RT
-						  lcrCycle = 10; // LCR
+					  rtcycle = 10; // RT
+					  lcrCycle = 10; // LCR
 				  }
-			  }
+//#if APIVERSNUM < 20301
+//			  }
+//#endif
 			  if ( nextLcdUpdate <= time(NULL) )
 				  nextLcdUpdate=(time(NULL)/60)*60+60;
 		  }
